@@ -84,6 +84,48 @@ class SparseVectorTests(unittest.TestCase):
         self.assertEqual(algebra.left_fold([left, middle, right]), SparseVector({"xyz": 1}))
         self.assertEqual(algebra.right_fold([left, middle, right]), SparseVector({"xyz": 1}))
 
+    def test_algebra_operator_helpers(self):
+        algebra = Algebra(product=lambda left, right: SparseVector({f"{left}{right}": 1}))
+        left = SparseVector({"x": 1})
+        right = SparseVector({"y": 1})
+
+        self.assertEqual(algebra.twist(left, right), SparseVector({"yx": 1}))
+        self.assertEqual(algebra.commutator(left, right), SparseVector({"xy": 1}) - SparseVector({"yx": 1}))
+        self.assertEqual(algebra.lie_bracket(left, right), SparseVector({"xy": 1}) - SparseVector({"yx": 1}))
+
+    def test_series_and_operator_checks(self):
+        algebra = Algebra()
+        algebra.set_product(lambda left, right: SparseVector({f"{left}{right}": 1}))
+        element = SparseVector({"x": 1})
+
+        expected = SparseVector()
+        expected[()] = 1
+        expected["()x"] = 1
+        expected["()xx"] = Fraction(1, 2)
+        self.assertEqual(algebra.exponential(element, order=2), expected)
+
+        expected = SparseVector()
+        expected[()] = 1
+        expected["()x"] = 1
+        expected["()xx"] = 1
+        self.assertEqual(algebra.polynomial(element, order=2), expected)
+
+        expected = SparseVector()
+        expected["()x"] = 1
+        expected["()xx"] = -Fraction(1, 2)
+        self.assertEqual(algebra.logarithm(element, order=2), expected)
+
+        expected = SparseVector()
+        expected[()] = 1
+        expected["()x"] = 1
+        expected["()xx"] = 1
+        self.assertEqual(algebra.geometric(element, order=2), expected)
+
+        operator = lambda value: value * 0
+        self.assertTrue(algebra.is_multiplicative(operator, [element, element]))
+        self.assertTrue(algebra.is_rota_leibniz(operator, [element, element]))
+        self.assertTrue(algebra.is_rota_baxter(operator, [element, element]))
+
 
 if __name__ == "__main__":
     unittest.main()
