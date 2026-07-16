@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import gcd, sqrt 
+from math import lcm, sqrt 
 from typing import Any, Dict, Iterable, Iterator, MutableMapping, Optional, Union
 
+from functools import reduce
 
 class ZeroType:
     def __repr__(self) -> str:
@@ -216,28 +217,41 @@ class SparseVector(MutableMapping[Any, Fraction]):
     def iscolinear(self, other: "SparseVector" ) -> bool :
         return abs( abs(self.cosine(other)) - 1.0 ) < 1e-6
 
-    def integer_coefficients(self): 
-        pass
-    
+    def integer_coefficients(self):
+        """
+        Returns (d, obj) where d is the LCM of all coefficient denominators
+        (an int), and obj is a SparseVector with every coefficient equal to
+        d times the original (hence integral, denominator == 1).
+        """
+        if not self._data:
+            return 1, SparseVector()
+
+        denominators = (c.denominator for c in self._data.values())
+        d = reduce(lcm, denominators, 1)
+
+        result = SparseVector()
+        for key, coeff in self._data.items():
+            result._data[key] = Fraction(coeff * d)
+
+        return d, result
+
     def __str__(self) -> str:
         if not self._data:
             return "0"
 
-        terms = []
+        d, integer_self = self.integer_coefficients()
 
-        for key, coeff in sorted(self._data.items(), key=lambda item: str(item[0])):
-            denominator = coeff.denominator
-            numerator = coeff.numerator
+        terms = []
+        for key, coeff in sorted(integer_self._data.items(), key=lambda item: str(item[0])):
+            numerator = coeff.numerator  # denominator is guaranteed to be 1 here
             if numerator == 0:
                 continue
-            if numerator == 1 and denominator == 1:
+            if numerator == 1:
                 term = str(key)
-            elif numerator == -1 and denominator == 1:
+            elif numerator == -1:
                 term = f"-{str(key)}"
-            elif denominator == 1:
-                term = f"{numerator} {str(key)}"
             else:
-                term = f"{numerator}/{denominator} {str(key)}"
+                term = f"{numerator} {str(key)}"
             terms.append(term)
 
         if not terms:
@@ -246,13 +260,16 @@ class SparseVector(MutableMapping[Any, Fraction]):
         parts = []
         for idx, term in enumerate(terms):
             if idx == 0:
-                if term.startswith("-"):
-                    parts.append(term)
-                else:
-                    parts.append(term)
+                parts.append(term)
             else:
                 if term.startswith("-"):
                     parts.append("- " + term[1:])
                 else:
                     parts.append("+ " + term)
-        return " ".join(parts)
+
+        body = "(" + " ".join(parts) + ")"
+
+        if d == 1:
+            # still want the same "(...)/1" shape? -- see note below
+            return f"{body}/{d}"
+        return f"{body}/{d}"
