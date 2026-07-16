@@ -267,9 +267,8 @@ class SparseVector(MutableMapping[Any, Fraction]):
                 else:
                     parts.append("+ " + term)
 
-        body = "(" + " ".join(parts) + ")"
+        body = "⟅" + " ".join(parts) + "⟆"
 
         if d == 1:
-            # still want the same "(...)/1" shape? -- see note below
-            return f"{body}/{d}"
+            return f"{body}"
         return f"{body}/{d}"
