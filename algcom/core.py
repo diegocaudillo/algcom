@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import gcd
+from math import gcd, sqrt 
 from typing import Any, Dict, Iterable, Iterator, MutableMapping, Optional, Union
 
 
@@ -204,21 +204,32 @@ class SparseVector(MutableMapping[Any, Fraction]):
             return self.bracket(other)
 
         return functional
+    
+    def cosine(self, other : "SparseVector") -> float : 
+        if self is Zero or other is Zero :
+            return 0
+        dot = self.bracket(other)
+        left = self.bracket(self)
+        right = other.bracket(other) 
+        return dot / ( sqrt( left * right) ) 
+    
+    def iscolinear(self, other: "SparseVector" ) -> bool :
+        return abs( abs(self.cosine(other)) - 1.0 ) < 1e-6
 
+    def integer_coefficients(self): 
+        pass
+    
     def __str__(self) -> str:
         if not self._data:
             return "0"
 
         terms = []
+
         for key, coeff in sorted(self._data.items(), key=lambda item: str(item[0])):
             denominator = coeff.denominator
             numerator = coeff.numerator
             if numerator == 0:
                 continue
-            if denominator != 1:
-                g = gcd(abs(numerator), denominator)
-                numerator //= g
-                denominator //= g
             if numerator == 1 and denominator == 1:
                 term = str(key)
             elif numerator == -1 and denominator == 1:
