@@ -16,12 +16,15 @@ class ZeroType:
 
 Zero = ZeroType()
 
+def __has_copy(object) -> bool:
+    return hasattr(object, 'copy') and callable(getattr(object, 'copy'))
+
 
 class BasisElement:
     """A lightweight wrapper around a user basis element."""
 
     def __init__(self, value: Any):
-        self.value = value
+        self.value = value.copy() if __has_copy(value) else value
 
     def copy(self) -> "BasisElement":
         return BasisElement(self.value)
@@ -41,33 +44,7 @@ class BasisElement:
         return str(self.value)
 
     def __lt__(self, other: Any) -> bool:
-        if isinstance(other, BasisElement):
-            return str(self) < str(other)
         return str(self) < str(other)
-
-    def rank(self) -> Optional[int]:
-        method = getattr(self.value, "rank", None)
-        if callable(method):
-            return method()
-        return None
-
-    def degree(self) -> Optional[int]:
-        method = getattr(self.value, "degree", None)
-        if callable(method):
-            return method()
-        return None
-
-    def weight(self) -> Optional[int]:
-        method = getattr(self.value, "weight", None)
-        if callable(method):
-            return method()
-        return None
-
-    def __len__(self) -> int:
-        try:
-            return len(self.value)
-        except TypeError:
-            return 0
 
 
 def coerce_basis_element(value: Any) -> Any:

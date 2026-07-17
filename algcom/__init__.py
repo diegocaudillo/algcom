@@ -1,5 +1,5 @@
 from .algebra import Algebra
 from .core import BasisElement, SparseVector, Zero
-from .tensor import Tensor, tensor
+from .tensor import TensorWord
 
-__all__ = ["BasisElement", "SparseVector", "Zero", "Tensor", "tensor", "Algebra"]
+__all__ = ["BasisElement", "SparseVector", "Zero", "TensorWord", "Algebra"]
