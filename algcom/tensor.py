@@ -30,14 +30,23 @@ class TensorWord(BasisElement):
         self.rank = len(self.value) 
         self._flattening()
     
+    def isfunction(self) -> bool: 
+        return all(isinstance(f,Callable) for f in self.value)
 
     def pre_compose(self, word_of_functions : "TensorWord" ) -> "TensorWord":
         '''Evaluate a tensor of functions in this term entry-wise.'''
-        if word_of_functions.rank != self.rank :
+        if word_of_functions.rank != self.rank or not word_of_functions.isfunction():
             return None
         return TensorWord( tuple( 
             word_of_functions[i]( self.value[i] ) for i in range(self.rank)
             ) )
+    
+    def evaluate_at(self, point : "TensorWord") -> "TensorWord":
+        if not self.isfunction() or self.rank != point.rank :
+            return None
+        return TensorWord( tuple(
+            self.value[i]( point[i] ) for i in range(self.rank) 
+        )) 
 
     @classmethod
     def power(cls, item , n : int) :  
