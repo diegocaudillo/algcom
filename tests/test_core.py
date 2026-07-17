@@ -43,6 +43,15 @@ class SparseVectorTests(unittest.TestCase):
         self.assertEqual(left.copy(), left)
         self.assertTrue(left < BasisElement("y"))
 
+    def test_sparse_vector_accepts_numpy_arrays_as_basis_elements(self):
+        import numpy as np
+
+        matrix = np.array([[1, 0], [0, 1]], dtype=int)
+        vector = SparseVector({matrix: 1})
+
+        self.assertEqual(vector[matrix], Fraction(1, 1))
+        self.assertEqual(vector[np.array([[1, 0], [0, 1]], dtype=int)], Fraction(1, 1))
+
     def test_algebra_scaffold(self):
         def product_rule(left, right):
             return SparseVector({f"{left}{right}": 1})

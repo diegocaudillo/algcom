@@ -58,7 +58,8 @@ def coerce_basis_element(value: Any) -> Any:
 class SparseVector(MutableMapping[Any, Fraction]):
     """Dictionary-backed sparse vector over a set of basis elements."""
 
-    _tol = Fraction(1e-6).limit_denominator() 
+    _tol = Fraction(1e-3).limit_denominator() 
+    _lim = 1000
 
     def __init__(self, data: Optional[Union["SparseVector", Dict[Any, Any], Iterable[Any], Any]] = None):
         self._data: Dict[Any, Fraction] = {}
@@ -226,7 +227,9 @@ class SparseVector(MutableMapping[Any, Fraction]):
 
         terms = []
         for key, coeff in sorted(integer_self._data.items(), key=lambda item: str(item[0])):
-            numerator = coeff.numerator  # denominator is guaranteed to be 1 here
+            c = coeff.limit_denominator(self._lim)
+            print("HELLO WORLD")
+            numerator = c.numerator  # denominator is guaranteed to be 1 here
             if numerator == 0:
                 continue
             if numerator == 1:
