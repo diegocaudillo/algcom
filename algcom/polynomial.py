@@ -52,7 +52,7 @@ def _poly_little_test():
 
     q = q1.multiply(q2)
     test1 = "OK" if q == px else "FAIL"
-    print(f"Factorisation: {q1} * {q2} = {q} {px} [{test1}]") 
+    print(f"Factorisation: {q1} * {q2} = {px} [{test1}]") 
     print("")
     print(f"Evaluation p(-1)= {px.evaluate_at(-1)}")
     print(f"Evaluation p( 0)={px.evaluate_at(0)}")
