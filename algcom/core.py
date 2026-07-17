@@ -6,6 +6,8 @@ from typing import Any, Dict, Iterable, Iterator, MutableMapping, Optional, Unio
 
 from functools import reduce
 
+Id = lambda x : x
+
 class ZeroType:
     def __repr__(self) -> str:
         return "Zero"
@@ -16,7 +18,7 @@ class ZeroType:
 
 Zero = ZeroType()
 
-def __has_copy(object) -> bool:
+def _has_copy(object) -> bool:
     return hasattr(object, 'copy') and callable(getattr(object, 'copy'))
 
 
@@ -24,7 +26,7 @@ class BasisElement:
     """A lightweight wrapper around a user basis element."""
 
     def __init__(self, value: Any):
-        self.value = value.copy() if __has_copy(value) else value
+        self.value = value.copy() if _has_copy(value) else value
 
     def copy(self) -> "BasisElement":
         return BasisElement(self.value)
@@ -69,13 +71,9 @@ class SparseVector(MutableMapping[Any, Fraction]):
             for key, value in data.items():
                 self[key] = value
             return
-        if isinstance(data, (tuple, list)):
-            if len(data) == 0:
-                return
-            if len(data) == 1:
-                self[data[0]] = 1
-                return
-            raise TypeError("Expected a single element or a mapping for initialization")
+        if isinstance(data, list):
+            self._data.update({k: Fraction(1) for k in data})
+            return
         self[data] = 1
 
     def _coerce_key(self, key: Any) -> Any:
