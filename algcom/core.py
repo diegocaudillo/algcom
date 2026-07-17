@@ -134,7 +134,7 @@ class SparseVector(MutableMapping[Any, Fraction]):
             result = self.copy()
             for key, coeff in other._data.items():
                 result[key] += coeff
-            return result
+            return type(self)(result)
         return NotImplemented
 
     def __sub__(self, other: Any) -> "SparseVector":
@@ -144,7 +144,7 @@ class SparseVector(MutableMapping[Any, Fraction]):
             result = self.copy()
             for key, coeff in other._data.items():
                 result[key] -= coeff
-            return result
+            return type(self)(result)
         return NotImplemented
 
     def __iadd__(self, other: Any) -> "SparseVector":
@@ -170,11 +170,11 @@ class SparseVector(MutableMapping[Any, Fraction]):
             result = SparseVector()
             for key, coeff in self._data.items():
                 result[key] = coeff * other
-            return result
+            return type(self)(result)
         return NotImplemented
 
     def __rmul__(self, other: Any) -> "SparseVector":
-        return self.__mul__(other)
+        return type(self)(self.__mul__(other))
 
     def __imul__(self, other: Any) -> "SparseVector":
         if isinstance(other, (int, Fraction)):
@@ -184,7 +184,7 @@ class SparseVector(MutableMapping[Any, Fraction]):
         return NotImplemented
 
     def __neg__(self) -> "SparseVector":
-        return -1 * self
+        return type(self)(-1 * self)
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, SparseVector):

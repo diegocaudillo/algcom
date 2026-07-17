@@ -28,7 +28,7 @@ def lift_product(rule: Callable[[object, object], object]) -> Callable[[SparseVe
                 else:
                     for item in outcome:
                         result[item] += lc * rc
-        return result
+        return type(left)(result)
     return lifted
 
 def lift_unit(one: SparseVector) -> Callable[[Fraction],SparseVector]:
@@ -38,7 +38,7 @@ def lift_unit(one: SparseVector) -> Callable[[Fraction],SparseVector]:
     '''
     if one is None : return None
     def lifted(scalar: Fraction) -> SparseVector : 
-        return SparseVector({one : scalar})
+        return type(one)(one * scalar)
     return lifted
 
 class Algebra:
