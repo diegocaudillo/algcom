@@ -79,6 +79,8 @@ def coerce_basis_element(value: Any) -> Any:
 class SparseVector(MutableMapping[Any, Fraction]):
     """Dictionary-backed sparse vector over a set of basis elements."""
 
+    _tol = Fraction(1e-6).limit_denominator() 
+
     def __init__(self, data: Optional[Union["SparseVector", Dict[Any, Any], Iterable[Any], Any]] = None):
         self._data: Dict[Any, Fraction] = {}
         if data is None:
@@ -215,7 +217,13 @@ class SparseVector(MutableMapping[Any, Fraction]):
         return dot / ( sqrt( left * right) ) 
     
     def iscolinear(self, other: "SparseVector" ) -> bool :
-        return abs( abs(self.cosine(other)) - 1.0 ) < 1e-6
+        return abs( abs(self.cosine(other)) - 1.0 ) < type(self)._tol
+    
+    def projection(self, other: "SparseVector") -> Fraction : 
+        norm_sq = self.bracket(self)
+        if norm_sq < type(self)._tol : 
+            return 0
+        return self.bracket(other) / norm_sq 
 
     def integer_coefficients(self):
         """

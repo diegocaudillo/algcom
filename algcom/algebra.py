@@ -1,123 +1,148 @@
+# algebra.py
 from __future__ import annotations
 
-from typing import Callable, Optional, Sequence
-
 from fractions import Fraction
+from typing import Callable, Sequence
 
 from .core import SparseVector
-from .tensor import Tensor, tensor
 
+
+def _unwrap(key):
+    return key.value if hasattr(key, "value") else key
+
+
+def lift_product(rule: Callable[[object, object], object]) -> Callable[[SparseVector, SparseVector], SparseVector]:
+    """
+    Turn a combinatorial product rule(a, b) -> SparseVector (or plain
+    iterable of items, coefficient 1 each) on two BASIS elements into a
+    bilinear map SparseVector x SparseVector -> SparseVector.
+    """
+    def lifted(left: SparseVector, right: SparseVector) -> SparseVector:
+        result = SparseVector()
+        for lk, lc in left._data.items():
+            for rk, rc in right._data.items():
+                outcome = rule(_unwrap(lk), _unwrap(rk))
+                if isinstance(outcome, SparseVector):
+                    for item, coeff in outcome._data.items():
+                        result[item] += lc * rc * coeff
+                else:
+                    for item in outcome:
+                        result[item] += lc * rc
+        return result
+    return lifted
+
+def lift_unit(one: SparseVector) -> Callable[[Fraction],SparseVector]:
+    '''
+    Given an element '1' in the vector space A, creates the unit 
+    function u:Q -> A given by u(r) = 1r
+    '''
+    if one is None : return None
+    def lifted(scalar: Fraction) -> SparseVector : 
+        return SparseVector({one : scalar})
+    return lifted
 
 class Algebra:
-    """A minimalist algebra scaffold that can hold a product and fold it."""
+    """Holds a (already-lifted) bilinear product and its unit."""
 
-    def __init__(self, product: Optional[Callable[[SparseVector, SparseVector], SparseVector]] = None):
-        self.product = product or (lambda left, right: tensor(left, right))
+    def __init__(self, product: Callable[[SparseVector, SparseVector], SparseVector],
+                 unit: Callable[[Fraction],SparseVector] | None = None):
+        self.product = product
+        self.unit = unit 
 
-    def _bilinear_lift(self, rule: Callable[[object, object], object]) -> Callable[[SparseVector, SparseVector], SparseVector]:
-        def lifted(left: SparseVector, right: SparseVector) -> SparseVector:
-            result = SparseVector()
-            for left_key, left_coeff in left._data.items():
-                for right_key, right_coeff in right._data.items():
-                    outcome = rule(left_key, right_key)
-                    if isinstance(outcome, SparseVector):
-                        for out_key, out_coeff in outcome._data.items():
-                            result[out_key] += left_coeff * right_coeff * out_coeff
-                    elif isinstance(outcome, (list, tuple)):
-                        for item in outcome:
-                            result[item] += left_coeff * right_coeff
-                    else:
-                        result[outcome] += left_coeff * right_coeff
-            return result
+    @classmethod
+    def from_rule(cls, rule, one: SparseVector | None = None) -> "Algebra":
+        return cls(lift_product(rule), unit=lift_unit(one)) 
 
-        return lifted
-
-    def set_product(self, rule: Callable[[object, object], object]) -> None:
-        self.product = self._bilinear_lift(rule)
-
-    def multiply(self, left: SparseVector, right: SparseVector) -> SparseVector:
+    def m(self, left: SparseVector, right: SparseVector) -> SparseVector:
         return self.product(left, right)
 
-    def left_fold(self, elements: Sequence[SparseVector]) -> SparseVector:
+    def fold_left(self, elements: Sequence[SparseVector]) -> SparseVector:
         if not elements:
-            return Tensor.unit()
+            return self.unit(1)
         result = elements[0]
-        for element in elements[1:]:
-            result = self.multiply(result, element)
+        for e in elements[1:]:
+            result = self.m(result, e)
         return result
 
-    def right_fold(self, elements: Sequence[SparseVector]) -> SparseVector:
+    def fold_right(self, elements: Sequence[SparseVector]) -> SparseVector:
         if not elements:
-            return Tensor.unit()
+            return self.unit(1)
         result = elements[-1]
-        for element in reversed(elements[:-1]):
-            result = self.multiply(element, result)
+        for e in reversed(elements[:-1]):
+            result = self.m(e, result)
         return result
-
-    def twist(self, left: SparseVector, right: SparseVector) -> SparseVector:
-        return self.multiply(right, left)
 
     def commutator(self, left: SparseVector, right: SparseVector) -> SparseVector:
-        return self.multiply(left, right) - self.multiply(right, left)
+        return self.m(left, right) - self.m(right, left)
 
-    def lie_bracket(self, left: SparseVector, right: SparseVector) -> SparseVector:
-        return self.commutator(left, right)
-
-    def _power_series(self, element: SparseVector, order: int = 3) -> list[SparseVector]:
-        series = []
-        current = Tensor.unit().as_sparse_vector()
-        series.append(current)
-        for _ in range(1, order + 1):
-            current = self.multiply(current, element)
-            series.append(current)
-        return series
-
-    def exponential(self, element: SparseVector, order: int = 3) -> SparseVector:
-        series = self._power_series(element, order)
-        result = SparseVector()
-        for index, term in enumerate(series):
-            if index == 0:
-                result += Tensor.unit().as_sparse_vector()
-            else:
-                result += term * Fraction(1, index)
+    def power(self, x: SparseVector, n: int) -> SparseVector:
+        if n == 0:
+            return self.unit(1)
+        result = x.copy()
+        for _ in range(n - 1):
+            result = self.m(result, x)
         return result
 
-    def polynomial(self, element: SparseVector, order: int = 3) -> SparseVector:
-        series = self._power_series(element, order)
-        result = SparseVector()
-        for index, term in enumerate(series):
-            result += term * Fraction(1, 1)
+    def exponential(self, x: SparseVector, order: int = 5) -> SparseVector:
+        """exp(x) = sum_{n=0}^{order} x^n / n! """
+        result = self.unit(1)
+        term = self.unit(1)
+        fact = 1
+        for n in range(1, order + 1):
+            term = self.m(term, x)
+            fact *= n
+            result += term * Fraction(1, fact)
         return result
 
-    def logarithm(self, element: SparseVector, order: int = 3) -> SparseVector:
-        series = self._power_series(element, order)
-        result = SparseVector()
-        for index, term in enumerate(series[1:], start=1):
-            if index > 0:
-                result += term * Fraction((-1) ** (index + 1), index)
+    def logarithm(self, x: SparseVector, order: int = 5) -> SparseVector:
+        """log(x) = sum_{n=1}^{order} (-1)^{n+1} (x-1)^n / n"""
+        result = self.unit(0)
+        term = self.unit(1)
+        x_ = x - self.unit(1)
+        for n in range(1, order + 1):
+            term = self.m(term, x_ )
+            sign = 1 if n % 2 == 1 else -1
+            result += term * Fraction(sign, n)
         return result
 
-    def geometric(self, element: SparseVector, order: int = 3) -> SparseVector:
-        series = self._power_series(element, order)
-        result = SparseVector()
-        for index, term in enumerate(series):
-            result += term * Fraction(1, 1)
+    def geometric(self, x: SparseVector, order: int = 5) -> SparseVector:
+        """(1-x)^-1 truncated: sum_{n=0}^{order} x^n """
+        result = self.unit(1)
+        term = self.unit(1)
+        for n in range(1, order + 1):
+            term = self.m(term, x)
+            result += term
         return result
 
-    def is_multiplicative(self, operator: Callable[[SparseVector], SparseVector], sample: Sequence[SparseVector]) -> bool:
-        if len(sample) < 2:
-            return True
-        left, right = sample[0], sample[1]
-        return operator(self.multiply(left, right)) == self.multiply(operator(left), operator(right))
-
-    def is_rota_leibniz(self, operator: Callable[[SparseVector], SparseVector], sample: Sequence[SparseVector]) -> bool:
-        if len(sample) < 2:
-            return True
-        left, right = sample[0], sample[1]
-        return operator(self.multiply(left, right)) == self.multiply(operator(left), right) + self.multiply(left, operator(right))
-
-    def is_rota_baxter(self, operator: Callable[[SparseVector], SparseVector], sample: Sequence[SparseVector]) -> bool:
-        if len(sample) < 2:
-            return True
-        left, right = sample[0], sample[1]
-        return self.multiply(operator(left), operator(right)) == operator(self.multiply(operator(left), right) + self.multiply(left, operator(right)))
+    def rota_baxter(self, 
+            R : Callable[[SparseVector],SparseVector],
+            a : SparseVector,
+            b : SparseVector) -> Fraction :
+        '''
+        Compute the parameter p in the expression
+        R(a)R(b) - R(aR(b) + R(a)b) =  p ab
+        If p does not exist, return None.
+        '''
+        Ra, Rb = R(a) , R(b)
+        a_Rb = self.m(a,Rb)
+        Ra_b = self.m(Ra,b)
+        Left = self.m(Ra,Rb) - R( a_Rb + Ra_b)
+        Right = R( self.m(a,b) )
+        return Left.projection(Right) if Left.iscolinear(Right) else None
+    
+    def rota_leibnitz(self,
+            D : Callable[[SparseVector],SparseVector],
+            x : SparseVector,
+            y : SparseVector) -> Fraction :
+        '''
+        Compute the parameter p in the expression
+        D(xy) - D(x)y - xD(y) = p D(x)D(y)
+        If p does not exist, return None.
+        '''
+        Dx , Dy = D(x) , D(y)
+        Dx_y = self.m(Dx,y)
+        x_Dy = self.m(x,Dy)
+        Left = D( self.m(x,y) ) - Dx_y - x_Dy 
+        Right = self.m(Dx,Dy)
+        return Left.projection(Right) if Left.iscolinear(Right) else None
+    
