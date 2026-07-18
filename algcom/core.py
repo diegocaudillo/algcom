@@ -214,22 +214,27 @@ class SparseVector(MutableMapping[Any, Fraction]):
         d = reduce(lcm, denominators, 1)
 
         result = SparseVector()
-        for key, coeff in self._data.items():
-            result._data[key] = Fraction(coeff * d)
+        if d > self._lim : 
+            shut = lambda c : Fraction( round(c * self._lim) )
+            for key, coeff in self._data.items():
+                result._data[key] = shut(coeff)
+            d = self._lim
+        else :
+            for key, coeff in self._data.items():
+                result._data[key] = Fraction(coeff * d)
 
-        return d, result
+        return d, result 
 
     def __str__(self) -> str:
         if not self._data:
             return "0"
 
-        d, integer_self = self.integer_coefficients()
-
         terms = []
+
+        d , integer_self = self.integer_coefficients()
+
         for key, coeff in sorted(integer_self._data.items(), key=lambda item: str(item[0])):
-            c = coeff.limit_denominator(self._lim)
-            print("HELLO WORLD")
-            numerator = c.numerator  # denominator is guaranteed to be 1 here
+            numerator = coeff.numerator  # denominator is guaranteed to be 1 here
             if numerator == 0:
                 continue
             if numerator == 1:
