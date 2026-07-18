@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Any
 
 from .core import SparseVector
 
@@ -53,6 +53,18 @@ class Algebra:
     def from_rule(cls, rule, one: SparseVector | None = None) -> "Algebra":
         return cls(lift_product(rule), unit=lift_unit(one)) 
 
+    def trim(self, x: SparseVector , order : int , deg : Callable[[Any],int]) -> SparseVector : 
+        z = type(x)()
+        y = SparseVector( { k : c for k,c in x._data.items() if deg(k.value) <=  order} )
+        z._data = y._data 
+        return z
+    
+    def safe_multiply(self, left: SparseVector, right: SparseVector,
+                      order : int , deg : Callable[[Any],int],
+                      ) -> SparseVector:
+        res = self.product(left, right)
+        return self.trim(res,order=order,deg=deg)
+
     def m(self, left: SparseVector, right: SparseVector) -> SparseVector:
         return self.product(left, right)
 
@@ -83,24 +95,31 @@ class Algebra:
             result = self.m(result, x)
         return result
 
-    def exponential(self, x: SparseVector, order: int = 5) -> SparseVector:
-        """exp(x) = sum_{n=0}^{order} x^n / n! """
+    def exponential(self, x: SparseVector, order: int = 5, deg: Callable[[Any],int] = None) -> SparseVector:
+        """
+        Compute the exponential of a given object by power series
+        exp(x) = sum_{n=0}^{order} x^n / n!
+        args.
+        x : an object in the algebra
+        order : the maximum order 
+        deg : if existant, used to trim the results  
+        """
         result = self.unit(1)
         term = self.unit(1)
         fact = 1
         for n in range(1, order + 1):
-            term = self.m(term, x)
+            term = self.m(term,x) if deg is None else self.safe_multiply(term, x, order, deg)
             fact *= n
             result += term * Fraction(1, fact)
         return result
 
-    def logarithm(self, x: SparseVector, order: int = 5) -> SparseVector:
+    def logarithm(self, x: SparseVector, order: int = 5, deg: Callable[[Any],int] = None) -> SparseVector:
         """log(x) = sum_{n=1}^{order} (-1)^{n+1} (x-1)^n / n"""
         result = self.unit(0)
         term = self.unit(1)
         x_ = x - self.unit(1)
         for n in range(1, order + 1):
-            term = self.m(term, x_ )
+            term = self.m(term, x_ ) if deg is None else self.safe_multiply(term,x_,order,deg)
             sign = 1 if n % 2 == 1 else -1
             result += term * Fraction(sign, n)
         return result
