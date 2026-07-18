@@ -24,7 +24,7 @@ One could install the package with pip.
 pip install git+https://github.com/diegocaudillo/algcom
 ```
 
-Read [Notebooks.md](how to run the notebooks) instead for first time users. 
+Read 2. [how to run the notebooks](Notebooks.md) instead for first time users. 
 
 ## Quick start
 
