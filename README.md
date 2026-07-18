@@ -1,4 +1,3 @@
-# Alert: Technical Description
 
 > algcom is MIT-licensed and free to use. If it's useful in your research, please cite it.
 
