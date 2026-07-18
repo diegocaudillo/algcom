@@ -81,7 +81,7 @@ class ExponentialSeries(SparseVector):
 def _series_str(series: SparseVector, factorial_weight: bool) -> str:
     terms = []
     for key, coeff in sorted(series._data.items(), key=lambda item: _degree(item[0])):
-        n = _degree(key)
+        n = key.value
         c = round(float(coeff),2) if coeff.denominator > 1000 else coeff
         label = "1" if n == 0 else (f"t" if n == 1 else f"t^{n}")
         if factorial_weight and n > 1:
