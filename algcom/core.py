@@ -175,7 +175,7 @@ class SparseVector(MutableMapping[Any, Fraction]):
         result = Fraction(0)
         for key, coeff in self._data.items():
             result += coeff * other._data.get(key, Fraction(0))
-        return result
+        return result.limit_denominator(self._lim)
 
     def dual(self) -> Any:
         """Return a callable dual functional for this sparse vector."""
