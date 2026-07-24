@@ -103,14 +103,6 @@ class Algebra:
     def commutator(self, left: SparseVector, right: SparseVector) -> SparseVector:
         return self.multiply(left, right) - self.m(right, left)
 
-    def power(self, x: SparseVector, n: int) -> SparseVector:
-        if n == 0:
-            return self.unit(1)
-        result = x.copy()
-        for _ in range(n - 1):
-            result = self.multiply(result, x)
-        return result
-
     def exponential(self, x: SparseVector) -> SparseVector:
         """
         Compute the exponential of a given object by power series

@@ -8,8 +8,6 @@ algebraic combinatorics:
 """
 
 from __future__ import annotations
-
-from fractions import Fraction
 from math import comb
 
 from .core import BasisElement, SparseVector
@@ -23,7 +21,7 @@ class OrdinaryTerm(BasisElement) :
         return f"t^{self.value}"
     
 OrdinarySeries = Algebra.from_rule(
-    rule = lambda n,m : [n+m], 
+    rule = lambda n,m : [OrdinaryTerm(n+m)], 
     one = SparseVector(OrdinaryTerm(0)),
     degree_method = lambda n : n  
 )
@@ -42,7 +40,7 @@ ExponentialSeries = Algebra.from_rule(
 )
 
 
-def _little_test(order = 7) : 
+def _exp_series_test(order = 7) : 
     import numpy as np 
     A = ExponentialSeries.copy() # Not a good idea to change the algebra globaly
     A.max_degree = order
@@ -59,4 +57,18 @@ def _little_test(order = 7) :
     
     print(f"MGF_(X+Y)(t) = ", M )
     print(f"K_(X+Y)(t) = ",A.logarithm(M) )
-    
+
+def _poly_test() : 
+    t0 = SparseVector(OrdinaryTerm(0))
+    t1 = SparseVector(OrdinaryTerm(1))
+    t2 = SparseVector(OrdinaryTerm(2))
+
+    q = t2 - t0 
+    p1 = t1 - t0 
+    p2 = t1 + t0 
+    p = OrdinarySeries.multiply(p1,p2)
+
+    test1 = "OK" if q == p else "FAIL"
+
+    print(f"Factorisation: {p1} * {p2} = {p} [{test1}]") 
+    print("")
