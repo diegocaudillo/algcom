@@ -53,6 +53,8 @@ class Algebra:
         self.degree_method = degree_method
         self.max_degree = max_degree
 
+    def copy(self) : 
+        return Algebra(self.product,self.unit,self.degree_method,self.max_degree)
     
     def _check_boundary(self) : 
         if self.max_degree is None or self.degree_method is None: 
