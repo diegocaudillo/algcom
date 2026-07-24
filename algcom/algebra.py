@@ -45,27 +45,41 @@ class Algebra:
     """Holds a (already-lifted) bilinear product and its unit."""
 
     def __init__(self, product: Callable[[SparseVector, SparseVector], SparseVector],
-                 unit: Callable[[Fraction],SparseVector] | None = None):
+                 unit: Callable[[Fraction],SparseVector] | None = None,
+                 degree_method : Callable[[Any],int] = None,
+                 max_degree: int | None = None):
         self.product = product
         self.unit = unit 
+        self.degree_method = degree_method
+        self.max_degree = max_degree
+
+    
+    def _check_boundary(self) : 
+        if self.max_degree is None or self.degree_method is None: 
+            raise NotImplementedError(
+                f"Infinite maps require degree_method and max_degree in {self.__name__} to be defined.")
 
     @classmethod
-    def from_rule(cls, rule, one: SparseVector | None = None) -> "Algebra":
-        return cls(lift_product(rule), unit=lift_unit(one)) 
+    def from_rule(cls, 
+                  rule, 
+                  one: SparseVector | None = None, 
+                  degre_method : Callable[[Any],int] = None,
+                  max_degree: int | None =None) -> "Algebra":
+        return cls(lift_product(rule), unit=lift_unit(one), max_degree=max_degree) 
 
-    def trim(self, x: SparseVector , order : int , deg : Callable[[Any],int]) -> SparseVector : 
-        z = type(x)()
-        y = SparseVector( { k : c for k,c in x._data.items() if deg(k.value) <=  order} )
-        z._data = y._data 
-        return z
-    
-    def safe_multiply(self, left: SparseVector, right: SparseVector,
-                      order : int , deg : Callable[[Any],int],
-                      ) -> SparseVector:
-        res = self.product(left, right)
-        return self.trim(res,order=order,deg=deg)
+    def multiply(self, left: SparseVector, right: SparseVector) -> SparseVector:
+        prod = self.product(left, right)
+        if not self.max_degree is None : 
+            self._check_boundary()
+            res = SparseVector({ 
+                k : c 
+                for k,c in prod._data.items()
+                    if self.degree_method(k) <= self.max_degree })
+            return type(left)(res)
+        return prod
 
     def m(self, left: SparseVector, right: SparseVector) -> SparseVector:
+        '''Same as multiply except it includes higher-order terms'''
         return self.product(left, right)
 
     def fold_left(self, elements: Sequence[SparseVector]) -> SparseVector:
@@ -73,7 +87,7 @@ class Algebra:
             return self.unit(1)
         result = elements[0]
         for e in elements[1:]:
-            result = self.m(result, e)
+            result = self.multiply(result, e)
         return result
 
     def fold_right(self, elements: Sequence[SparseVector]) -> SparseVector:
@@ -81,21 +95,21 @@ class Algebra:
             return self.unit(1)
         result = elements[-1]
         for e in reversed(elements[:-1]):
-            result = self.m(e, result)
+            result = self.multiply(e, result)
         return result
 
     def commutator(self, left: SparseVector, right: SparseVector) -> SparseVector:
-        return self.m(left, right) - self.m(right, left)
+        return self.multiply(left, right) - self.m(right, left)
 
     def power(self, x: SparseVector, n: int) -> SparseVector:
         if n == 0:
             return self.unit(1)
         result = x.copy()
         for _ in range(n - 1):
-            result = self.m(result, x)
+            result = self.multiply(result, x)
         return result
 
-    def exponential(self, x: SparseVector, order: int = 5, deg: Callable[[Any],int] = None) -> SparseVector:
+    def exponential(self, x: SparseVector) -> SparseVector:
         """
         Compute the exponential of a given object by power series
         exp(x) = sum_{n=0}^{order} x^n / n!
@@ -104,32 +118,35 @@ class Algebra:
         order : the maximum order 
         deg : if existant, used to trim the results  
         """
+        self._check_boundary()
         result = self.unit(1)
         term = self.unit(1)
         fact = 1
-        for n in range(1, order + 1):
-            term = self.m(term,x) if deg is None else self.safe_multiply(term, x, order, deg)
+        for n in range(1, self.max_degree + 1):
+            term = self.multiply(term,x) 
             fact *= n
             result += term * Fraction(1, fact)
         return result
 
-    def logarithm(self, x: SparseVector, order: int = 5, deg: Callable[[Any],int] = None) -> SparseVector:
+    def logarithm(self, x: SparseVector) -> SparseVector:
         """log(x) = sum_{n=1}^{order} (-1)^{n+1} (x-1)^n / n"""
+        self._check_boundary()
         result = self.unit(0)
         term = self.unit(1)
         x_ = x - self.unit(1)
-        for n in range(1, order + 1):
-            term = self.m(term, x_ ) if deg is None else self.safe_multiply(term,x_,order,deg)
+        for n in range(1, self.max_degree + 1):
+            term = self.multiply(term, x_ ) 
             sign = 1 if n % 2 == 1 else -1
             result += term * Fraction(sign, n)
         return result
 
-    def geometric(self, x: SparseVector, order: int = 5) -> SparseVector:
+    def geometric(self, x: SparseVector) -> SparseVector:
         """(1-x)^-1 truncated: sum_{n=0}^{order} x^n """
+        self._check_boundary() 
         result = self.unit(1)
         term = self.unit(1)
-        for n in range(1, order + 1):
-            term = self.m(term, x)
+        for n in range(1, self.max_degree + 1):
+            term = self.multiply(term, x)
             result += term
         return result
 
@@ -143,10 +160,10 @@ class Algebra:
         If p does not exist, return None.
         '''
         Ra, Rb = R(a) , R(b)
-        a_Rb = self.m(a,Rb)
-        Ra_b = self.m(Ra,b)
-        Left = self.m(Ra,Rb) - R( a_Rb + Ra_b)
-        Right = R( self.m(a,b) )
+        a_Rb = self.multiply(a,Rb)
+        Ra_b = self.multiply(Ra,b)
+        Left = self.multiply(Ra,Rb) - R( a_Rb + Ra_b)
+        Right = R( self.multiply(a,b) )
         return Left.projection(Right) if Left.iscolinear(Right) else None
     
     def rota_leibnitz(self,
@@ -159,9 +176,9 @@ class Algebra:
         If p does not exist, return None.
         '''
         Dx , Dy = D(x) , D(y)
-        Dx_y = self.m(Dx,y)
-        x_Dy = self.m(x,Dy)
-        Left = D( self.m(x,y) ) - Dx_y - x_Dy 
-        Right = self.m(Dx,Dy)
+        Dx_y = self.multiply(Dx,y)
+        x_Dy = self.multiply(x,Dy)
+        Left = D( self.multiply(x,y) ) - Dx_y - x_Dy 
+        Right = self.multiply(Dx,Dy)
         return Left.projection(Right) if Left.iscolinear(Right) else None
     
