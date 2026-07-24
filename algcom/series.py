@@ -71,7 +71,8 @@ class ExponentialSeries(SparseVector):
     def algebra(cls) -> Algebra:
         if cls._Algebra is None:
             rule = lambda n, m: SparseVector({n + m: comb(n + m, n)})
-            cls._Algebra = Algebra.from_rule(rule, one=cls.one())
+            degree = lambda n : n 
+            cls._Algebra = Algebra.from_rule(rule, one=cls.one(),degree_method=degree)
         return cls._Algebra
     
     def __str__(self) -> str:
@@ -93,16 +94,18 @@ def _series_str(series: SparseVector, factorial_weight: bool) -> str:
 def _little_test() : 
     import numpy as np 
     A = ExponentialSeries.algebra()
+    order = 6
+    A.max_degree = order
 
     X = np.random.normal(size=1000000) 
-    M = ExponentialSeries( { n : np.mean(X**n) for n in range(7)  } )
+    M = ExponentialSeries( { n : np.mean(X**n) for n in range(order+1)  } )
 
     print(f"MGF_X(t) = ", M )
-    print(f"K_X(t) = ",A.logarithm(M,deg=_degree) )
+    print(f"K_X(t) = ",A.logarithm(M) )
 
     X =  X + np.random.normal(size=1000000) 
-    M = ExponentialSeries( { n : np.mean(X**n) for n in range(7)  } )
+    M = ExponentialSeries( { n : np.mean(X**n) for n in range(order+1)  } )
     
     print(f"MGF_(X+Y)(t) = ", M )
-    print(f"K_(X+Y)(t) = ",A.logarithm(M,deg=_degree) )
+    print(f"K_(X+Y)(t) = ",A.logarithm(M) )
     

@@ -57,15 +57,15 @@ class Algebra:
     def _check_boundary(self) : 
         if self.max_degree is None or self.degree_method is None: 
             raise NotImplementedError(
-                f"Infinite maps require degree_method and max_degree in {self.__name__} to be defined.")
+                f"Algebra requires degree_method and max_degree for infinite series.")
 
     @classmethod
     def from_rule(cls, 
                   rule, 
                   one: SparseVector | None = None, 
-                  degre_method : Callable[[Any],int] = None,
+                  degree_method : Callable[[Any],int] = None,
                   max_degree: int | None =None) -> "Algebra":
-        return cls(lift_product(rule), unit=lift_unit(one), max_degree=max_degree) 
+        return cls(lift_product(rule), unit=lift_unit(one), degree_method=degree_method, max_degree=max_degree) 
 
     def multiply(self, left: SparseVector, right: SparseVector) -> SparseVector:
         prod = self.product(left, right)
@@ -74,7 +74,7 @@ class Algebra:
             res = SparseVector({ 
                 k : c 
                 for k,c in prod._data.items()
-                    if self.degree_method(k) <= self.max_degree })
+                    if self.degree_method(k.value) <= self.max_degree })
             return type(left)(res)
         return prod
 
