@@ -30,6 +30,11 @@ class BasisElement:
 
     def copy(self) -> "BasisElement":
         return BasisElement(self.value)
+    
+    def _order_key(self) : 
+        if hasattr(self.value,"__lt__") : 
+            return self.value
+        return self.__str__() 
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, BasisElement):
@@ -214,16 +219,43 @@ class SparseVector(MutableMapping[Any, Fraction]):
         d = reduce(lcm, denominators, 1)
 
         result = SparseVector()
-        if d > self._lim : 
-            shut = lambda c : Fraction( round(c * self._lim) )
-            for key, coeff in self._data.items():
-                result._data[key] = shut(coeff)
-            d = self._lim
-        else :
-            for key, coeff in self._data.items():
-                result._data[key] = Fraction(coeff * d)
+        for key, coeff in self._data.items():
+            result._data[key] = Fraction(coeff * d)
 
         return d, result 
+
+    def _decimal(self) : 
+        terms = []
+        
+        for key, coeff in self._ordered_items():
+            c = round( float(coeff) , 2) 
+            if abs(c) < max(0.01,self._tol):
+                continue
+            if abs(c-1.0) < max(0.01,self._tol):
+                term = str(key)
+            elif abs(c-1) < max(0.01,self._tol):
+                term = f"-{str(key)}"
+            else:
+                term = f"{c} {str(key)}"
+            terms.append(term)
+
+        if not terms:
+            return "0"
+
+        parts = []
+        for idx, term in enumerate(terms):
+            if idx == 0:
+                parts.append(term)
+            else:
+                if term.startswith("-"):
+                    parts.append("- " + term[1:])
+                else:
+                    parts.append("+ " + term)
+
+        return "⟅" + " ".join(parts) + "⟆"
+
+    def _ordered_items(self) : 
+        return sorted(self._data.items(), key=lambda item: item[0]._order_key())
 
     def __str__(self) -> str:
         if not self._data:
@@ -232,8 +264,9 @@ class SparseVector(MutableMapping[Any, Fraction]):
         terms = []
 
         d , integer_self = self.integer_coefficients()
+        if d >= self._lim : return self._decimal () 
 
-        for key, coeff in sorted(integer_self._data.items(), key=lambda item: str(item[0])):
+        for key, coeff in integer_self._ordered_items():
             numerator = coeff.numerator  # denominator is guaranteed to be 1 here
             if numerator == 0:
                 continue
