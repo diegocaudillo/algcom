@@ -298,3 +298,11 @@ class SparseVector(MutableMapping[Any, Fraction]):
         if d == 1:
             return f"{body}"
         return f"{body}/{d}"
+
+def LinearLift(f) : 
+    def fun(v: SparseVector) : 
+        res = SparseVector()
+        for k,c in v._data.items() : 
+            res += c*SparseVector(f(k.value))
+        return res    
+    return fun  
