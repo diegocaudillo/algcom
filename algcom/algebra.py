@@ -69,6 +69,29 @@ class Algebra:
                   max_degree: int | None =None) -> "Algebra":
         return cls(lift_product(rule), unit=lift_unit(one), degree_method=degree_method, max_degree=max_degree) 
 
+    @classmethod
+    def from_coefficients(cls,
+                    catalog : Sequence,
+                    coefficients : Callable[[Any,Any,Any],Fraction],
+
+                    one: SparseVector | None = None, 
+                    degree_method : Callable[[Any],int] = None,
+                    max_degree: int | None =None) -> "Algebra":
+
+        validate = (
+            lambda x : degree_method(x) <= max_degree 
+                if degree_method is not None and max_degree is not None
+                else True
+            )
+        def rule(a,b):
+            res = SparseVector()
+            for c in catalog : 
+                if not validate(c) : continue
+                res[c] = coefficients(a,b,c) 
+            return res
+        return cls.from_rule(rule=rule,one=one,degree_method=degree_method,max_degree=max_degree)
+
+
     def multiply(self, left: SparseVector, right: SparseVector) -> SparseVector:
         prod = self.product(left, right)
         if not self.max_degree is None : 
