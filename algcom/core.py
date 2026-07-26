@@ -31,10 +31,12 @@ class BasisElement:
     def copy(self) -> "BasisElement":
         return BasisElement(self.value)
     
-    def _order_key(self) : 
-        if hasattr(self.value,"__lt__") : 
+    def _order_key(self):
+        try:
+            self.value < self.value
             return self.value
-        return self.__str__() 
+        except TypeError:
+            return self.__str__()
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, BasisElement):

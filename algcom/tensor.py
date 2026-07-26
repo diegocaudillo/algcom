@@ -27,8 +27,7 @@ class TensorWord(BasisElement):
     def __init__(self, value : Sequence) :
         if not isinstance(value,Sequence) : return 
         self.value = TensorWord._flattening(value)
-        self.rank = len(self.value) 
-        self._flattening()
+        self.rank = len(self.value)
     
     def isfunction(self) -> bool: 
         return all(isinstance(f,Callable) for f in self.value)
@@ -53,7 +52,7 @@ class TensorWord(BasisElement):
         return cls(tuple( item for _ in range(n) ))
 
     def __str__(self):
-        return '⊗'.join(self.value)
+        return '⊗'.join(str(v) for v in self.value)
 
 class SparseTensor(SparseVector) : 
     '''
@@ -67,6 +66,9 @@ class SparseTensor(SparseVector) :
                     "SparseTensor", "SparseVector", list,
                     TensorWord, tuple , Any
                 ]]= None):
+        if data is None:
+            super().__init__({})
+            return
         if isinstance(data,SparseTensor) : 
             super().__init__(data)
         elif isinstance(data,SparseVector):
