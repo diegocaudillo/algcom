@@ -74,7 +74,7 @@ class SparseTensor(SparseVector) :
         elif isinstance(data,SparseVector):
             super().__init__({ TensorWord( (k,) ) : v for k,v in data._data.items() })
         elif isinstance(data,list): 
-            super().__init__({ k : 1 for k in data})
+            super().__init__({ TensorWord(k) : 1 for k in data})
         elif isinstance(data,(TensorWord,tuple)) : 
             super().__init__({ TensorWord(data) : 1 })
         else :
