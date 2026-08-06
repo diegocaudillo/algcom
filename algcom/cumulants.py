@@ -8,7 +8,7 @@ from .core import LinearLift, SparseVector
 
 
 class _PartitionScheme:
-    """Generate set partitions and associated Möbius-type coefficients."""
+    """Generate partitions and Möbius weights for each cumulant family."""
 
     def __init__(self, kind: str = "classical"):
         self.kind = (kind or "classical").lower()
@@ -17,14 +17,24 @@ class _PartitionScheme:
         if n <= 0:
             return [tuple()]
 
+        all_partitions = self._all_partitions(n)
+        if self.kind == "classical":
+            return all_partitions
+        if self.kind == "boolean":
+            return [partition for partition in all_partitions if self._is_interval_partition(partition)]
+        if self.kind == "free":
+            return [partition for partition in all_partitions if self._is_noncrossing(partition)]
+        if self.kind == "monotone":
+            return [partition for partition in all_partitions if self._is_monotone(partition)]
+        raise ValueError(f"unsupported cumulant type: {self.kind}")
+
+    def _all_partitions(self, n: int) -> List[Tuple[Tuple[int, ...], ...]]:
         elements = tuple(range(n))
 
         def build(remaining: Tuple[int, ...], current: List[List[int]]):
             if not remaining:
-                normalized = []
-                for block in current:
-                    normalized.append(tuple(sorted(block)))
-                yield tuple(sorted(normalized, key=lambda block: block))
+                normalized = [tuple(sorted(block)) for block in current]
+                yield tuple(sorted(normalized))
                 return
 
             first = remaining[0]
@@ -37,6 +47,58 @@ class _PartitionScheme:
             yield from build(remaining[1:], updated)
 
         return list(build(elements[1:], [[elements[0]]]))
+
+    def _is_interval_partition(self, partition: Sequence[Sequence[int]]) -> bool:
+        blocks = [tuple(sorted(block)) for block in partition]
+        if not blocks:
+            return True
+        values = [value for block in blocks for value in block]
+        if sorted(values) != list(range(len(values))):
+            return False
+        for block in blocks:
+            if not block:
+                return False
+            for index in range(1, len(block)):
+                if block[index] != block[index - 1] + 1:
+                    return False
+        return True
+
+    def _is_noncrossing(self, partition: Sequence[Sequence[int]]) -> bool:
+        blocks = [tuple(sorted(block)) for block in partition]
+        for index, left in enumerate(blocks):
+            for right in blocks[index + 1 :]:
+                if self._blocks_cross(left, right):
+                    return False
+        return True
+
+    @staticmethod
+    def _blocks_cross(left: Sequence[int], right: Sequence[int]) -> bool:
+        if len(left) < 2 or len(right) < 2:
+            return False
+        for first_index in range(len(left) - 1):
+            for second_index in range(first_index + 1, len(left)):
+                a = left[first_index]
+                b = left[second_index]
+                for third_index in range(len(right) - 1):
+                    for fourth_index in range(third_index + 1, len(right)):
+                        c = right[third_index]
+                        d = right[fourth_index]
+                        if (a < c < b < d) or (c < a < d < b):
+                            return True
+        return False
+
+    def _is_monotone(self, partition: Sequence[Sequence[int]]) -> bool:
+        if not self._is_noncrossing(partition):
+            return False
+
+        blocks = [tuple(sorted(block)) for block in partition]
+        ordered = sorted(blocks, key=lambda block: (block[0], block[-1]))
+        previous_max = None
+        for block in ordered:
+            if previous_max is not None and block[0] <= previous_max:
+                return False
+            previous_max = block[-1]
+        return True
 
     def moebius_coefficient(self, partition: Sequence[Sequence[int]]) -> int | float:
         size = len(partition)
@@ -114,14 +176,14 @@ class Cumulants:
         except TypeError:
             return None
 
-    def kappa(self, block: Sequence[SparseVector]) -> SparseVector:
+    def kappa(self, block: Sequence[SparseVector], kind: str = "classical", fold: str = "left") -> SparseVector:
         '''
         Replace by hand-crafted combinatorial cumulant for a block of variables.
         eg. 
         C = Cumulants(A,B,umbra)
         C.kappa = lambda block : CombinatorialCumulant(block) 
         '''
-        return self.moment_cumulant(block, kind="classical", fold="left")
+        return self.moment_cumulant(block, kind=kind, fold=fold)
 
     def moment_cumulant(
         self,
@@ -176,7 +238,7 @@ class Cumulants:
             block_terms = []
             for block in partition:
                 block_values = [items[index] for index in block]
-                block_terms.append(self.kappa(block_values))
+                block_terms.append(self.kappa(block_values, kind=kind, fold=fold))
             combined = self._product(block_terms, self.algebra_b, fold=fold)
             result += combined
         return result
