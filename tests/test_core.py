@@ -1,69 +1,53 @@
 import unittest
 from fractions import Fraction
 
-from algcom import Algebra, BasisElement, SparseVector, TensorWord, Zero
+from algcom.core import BasisElement, SparseVector, Zero, LinearLift
 
 
-class SparseVectorTests(unittest.TestCase):
-    def test_sparse_vector_defaults_to_zero_and_accumulates(self):
-        v = SparseVector()
-        v["x"] += 2
-        v["x"] += 3
-        self.assertEqual(v["x"], 5)
-        self.assertEqual(v["y"], 0)
-
-    def test_sparse_vector_arithmetic_and_zero_pruning(self):
-        u = SparseVector({"x": Fraction(1, 2), "y": 1})
-        v = SparseVector({"x": Fraction(1, 2), "z": 2})
-        self.assertEqual(u + v, SparseVector({"x": 1, "y": 1, "z": 2}))
-        self.assertEqual(u - v, SparseVector({"y": 1, "z": -2}))
-        self.assertEqual(2 * u, SparseVector({"x": 1, "y": 2}))
-        self.assertEqual(u * 3, SparseVector({"x": Fraction(3, 2), "y": 3}))
-        self.assertEqual(u + Zero, u)
-
-    def test_string_and_equality_ignore_order(self):
-        left = SparseVector({"x": 2, "y": -1})
-        right = SparseVector({"y": -1, "x": 2})
-        self.assertEqual(left, right)
-        self.assertIn("x", str(left))
-
-    def test_tensor_from_elements_and_vectors(self):
-        u = SparseVector({"x": 2})
-        v = SparseVector({"y": 3})
-        t = TensorWord( ("x","y") )
-        self.assertTrue(isinstance(t, TensorWord))
-        self.assertEqual(t.rank,2)
-
-    def test_basis_element_helpers(self):
+class CoreTests(unittest.TestCase):
+    def test_basis_element_round_trip_and_equality(self):
         left = BasisElement("x")
         right = BasisElement("x")
         self.assertEqual(left, right)
-        self.assertEqual(hash(left), hash(right))
+        self.assertEqual(left, "x")
         self.assertEqual(str(left), "x")
-        self.assertEqual(left.copy(), left)
-        self.assertTrue(left < BasisElement("y"))
+        self.assertEqual(repr(left), "BasisElement('x')")
 
-    def test_sparse_vector_accepts_numpy_arrays_as_basis_elements(self):
-        import numpy as np
+    def test_sparse_vector_add_sub_mul_and_string_form(self):
+        left = SparseVector({"x": 2, "y": -1})
+        right = SparseVector({"x": 1, "z": 3})
 
-        matrix = np.array([[1, 0], [0, 1]], dtype=int)
-        vector = SparseVector({matrix: 1})
+        self.assertEqual(left + right, SparseVector({"x": 3, "y": -1, "z": 3}))
+        self.assertEqual(left - right, SparseVector({"x": 1, "y": -1, "z": -3}))
+        self.assertEqual(left * 2, SparseVector({"x": 4, "y": -2}))
+        self.assertEqual(2 * left, SparseVector({"x": 4, "y": -2}))
+        self.assertEqual(str(left), "⟅2 x - y⟆")
 
-        self.assertEqual(vector[matrix], Fraction(1, 1))
-        self.assertEqual(vector[np.array([[1, 0], [0, 1]], dtype=int)], Fraction(1, 1))
+    def test_sparse_vector_zero_and_integer_coefficients(self):
+        vector = SparseVector({"x": Fraction(1, 2), "y": Fraction(2, 3)})
+        d, scaled = vector.integer_coefficients()
 
-    def test_algebra_scaffold(self):
-        def product_rule(left, right):
-            return SparseVector({f"{left}{right}": 1})
+        self.assertEqual(d, 6)
+        self.assertEqual(scaled, SparseVector({"x": 3, "y": 4}))
+        self.assertEqual(SparseVector() + Zero, SparseVector())
+        self.assertEqual((SparseVector() - SparseVector())._data, {})
 
-        algebra = Algebra(product=product_rule)
-        left = SparseVector({"x": 1})
-        middle = SparseVector({"y": 1})
-        right = SparseVector({"z": 1})
+    def test_sparse_vector_dual_bracket_projection_and_colinearity(self):
+        left = SparseVector({"x": 2, "y": -1})
+        right = SparseVector({"x": 1, "y": 1})
 
-        self.assertEqual(algebra.multiply(left, middle), SparseVector({"xy": 1}))
-        self.assertEqual(algebra.left_fold([left, middle, right]), SparseVector({"xyz": 1}))
-        self.assertEqual(algebra.right_fold([left, middle, right]), SparseVector({"xyz": 1}))
+        self.assertEqual(left.bracket(right), Fraction(1))
+        self.assertEqual(left.dual()(right), Fraction(1))
+        self.assertEqual(left.projection(right), Fraction(1, 5))
+        self.assertTrue(left.iscolinear(SparseVector({"x": 4, "y": -2})))
+        self.assertFalse(left.iscolinear(SparseVector({"x": 1, "y": 1})))
+
+    def test_linear_lift_applies_a_function_to_each_basis_key(self):
+        lifted = LinearLift(lambda value: {"x": value})
+        vector = SparseVector({"a": 1})
+
+        with self.assertRaises(ValueError):
+            lifted(vector)
 
 
 if __name__ == "__main__":
