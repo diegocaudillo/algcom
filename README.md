@@ -65,7 +65,7 @@ This is the current beginner's guide.
 
 ## How to Cite
 
-If you use `algcom` in academic work, please cite both the software.
+If you use `algcom` in academic work, please cite the software.
 
 BibTeX:
 
